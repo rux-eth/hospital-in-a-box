@@ -5,6 +5,7 @@ import com.hospitalinabox.domain.entity.Hl7MessageEntity;
 import com.hospitalinabox.domain.repository.AuditLogRepository;
 import com.hospitalinabox.domain.repository.Hl7MessageRepository;
 import com.hospitalinabox.dto.Hl7IngestResponse;
+import com.hospitalinabox.dto.Hl7Metadata;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,24 +18,54 @@ public class Hl7IngestService {
 
     private final Hl7MessageRepository hl7MessageRepository;
     private final AuditLogRepository auditLogRepository;
+    private final Hl7ParsingService hl7ParsingService;
+    private final AdtA01Service adtA01Service;
 
     @Transactional
     public Hl7IngestResponse ingestRawMessage(String rawMessage) {
-        // For now we don't parse HL7 – just store it.
         Hl7MessageEntity message = Hl7MessageEntity.builder()
-                .messageControlId(null) // will be filled when we parse MSH-10
-                .messageType("UNKNOWN") // will be filled when we parse MSH-9
                 .payload(rawMessage)
                 .receivedAt(OffsetDateTime.now())
                 .build();
+
+        String status;
+        String details = null;
+        String error = null;
+
+        try {
+            Hl7Metadata metadata = hl7ParsingService.extractMetadata(rawMessage);
+            message.setMessageType(metadata.messageType());
+            message.setMessageControlId(metadata.messageControlId());
+            status = "PARSED";
+            details = "messageType=" + metadata.messageType()
+                    + ", messageControlId=" + metadata.messageControlId();
+
+            // If ADT^A01, process into Patient/Encounter
+            if ("ADT^A01".equals(metadata.messageType())) {
+                try {
+                    adtA01Service.processAdtA01(rawMessage);
+                    details += ", processed=ADT^A01";
+                } catch (Exception e) {
+                    error = "ADT^A01 processing failed: " + e.getMessage();
+                    status = "PROCESS_FAILED";
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            message.setMessageType("UNKNOWN");
+            message.setMessageControlId(null);
+            status = "PARSE_FAILED";
+            error = e.getMessage();
+        }
 
         message = hl7MessageRepository.save(message);
 
         AuditLogEntity audit = AuditLogEntity.builder()
                 .hl7Message(message)
-                .status("RECEIVED")
-                .errorMessage(null)
-                .details(null)
+                .status(status)
+                .errorMessage(error)
+                .details(details)
                 .createdAt(OffsetDateTime.now())
                 .build();
 

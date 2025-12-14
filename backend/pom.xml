@@ -82,6 +82,11 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+  <groupId>ca.uhn.hapi</groupId>
+  <artifactId>hapi-structures-v25</artifactId>
+  <version>${hapi.hl7.version}</version>
+</dependency>
   </dependencies>
 
   <build>

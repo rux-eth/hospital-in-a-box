@@ -1,4 +1,9 @@
 {
     "java.configuration.updateBuildConfiguration": "interactive",
-    "java.compile.nullAnalysis.mode": "automatic"
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.format.settings.url": ".vscode/eclipse-formatter.xml",
+    // format on save for java files
+    "java.format.enable": true,
+    "editor.formatOnSave": true
+
 }

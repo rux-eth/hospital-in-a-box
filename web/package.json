@@ -1,0 +1,12 @@
+{
+  "name": "hospital-in-a-box-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"no build step yet\"",
+    "start": "node server.js"
+  },
+  "devDependencies": {
+    "@types/express": "~5.0.6"
+  }
+}

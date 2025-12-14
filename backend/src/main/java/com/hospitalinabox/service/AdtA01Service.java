@@ -22,6 +22,7 @@ public class AdtA01Service {
     private final Hl7ParsingService hl7ParsingService;
     private final PatientRepository patientRepository;
     private final EncounterRepository encounterRepository;
+    private final FhirResourceService fhirResourceService;
 
     @Transactional
     public void processAdtA01(String rawMessage) throws HL7Exception {
@@ -52,9 +53,9 @@ public class AdtA01Service {
         patient = patientRepository.save(patient);
 
         // ---- Encounter fields (PV1) ----
-        String patientClassCode = terser.get("/PV1-2"); // I/O/E etc.
-        String visitNumber = terser.get("/PV1-19-1"); // CX.1
-        String admitDateTimeStr = terser.get("/PV1-44"); // YYYYMMDD[HHMM[SS]]
+        String patientClassCode = terser.get("/PV1-2");
+        String visitNumber = terser.get("/PV1-19-1");
+        String admitDateTimeStr = terser.get("/PV1-44");
 
         EncounterEntity encounter = EncounterEntity.builder()
                 .patient(patient)
@@ -66,7 +67,11 @@ public class AdtA01Service {
                 .reason(null)
                 .build();
 
-        encounterRepository.save(encounter);
+        encounter = encounterRepository.save(encounter);
+
+        // NEW: create/update FHIR resources
+        fhirResourceService.createOrUpdatePatientResource(patient);
+        fhirResourceService.createEncounterResource(encounter);
     }
 
     private String mapGender(String hl7Gender) {

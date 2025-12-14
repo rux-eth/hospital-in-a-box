@@ -6,10 +6,9 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "hl7_messages",
-       indexes = {
-           @Index(name = "idx_hl7_message_control_id", columnList = "message_control_id")
-       })
+@Table(name = "hl7_messages", indexes = {
+        @Index(name = "idx_hl7_message_control_id", columnList = "message_control_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,8 +28,7 @@ public class Hl7MessageEntity {
     @Column(name = "message_type", length = 32)
     private String messageType;
 
-    @Lob
-    @Column(name = "payload", nullable = false)
+    @Column(name = "payload", nullable = false, columnDefinition = "TEXT")
     private String payload;
 
     @Column(name = "received_at", nullable = false)

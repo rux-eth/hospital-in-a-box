@@ -6,11 +6,10 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "fhir_resources",
-       indexes = {
-           @Index(name = "idx_fhir_resource_type_id", columnList = "resource_type, resource_id"),
-           @Index(name = "idx_fhir_patient", columnList = "patient_id")
-       })
+@Table(name = "fhir_resources", indexes = {
+        @Index(name = "idx_fhir_resource_type_id", columnList = "resource_type, resource_id"),
+        @Index(name = "idx_fhir_patient", columnList = "patient_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -35,8 +34,7 @@ public class FhirResourceEntity {
     @Column(name = "event_time")
     private OffsetDateTime eventTime;
 
-    @Lob
-    @Column(name = "body", nullable = false)
+    @Column(name = "body", nullable = false, columnDefinition = "TEXT")
     private String body; // FHIR JSON
 
     @Column(name = "created_at", nullable = false)

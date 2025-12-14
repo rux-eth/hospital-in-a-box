@@ -5,9 +5,12 @@ import com.hospitalinabox.domain.entity.PatientEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface EncounterRepository extends JpaRepository<EncounterEntity, UUID> {
 
     List<EncounterEntity> findByPatient(PatientEntity patient);
+
+    Optional<EncounterEntity> findByPatientAndEncounterIdentifier(PatientEntity patient, String encounterIdentifier);
 }

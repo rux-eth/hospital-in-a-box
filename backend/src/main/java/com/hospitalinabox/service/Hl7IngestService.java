@@ -20,6 +20,7 @@ public class Hl7IngestService {
     private final AuditLogRepository auditLogRepository;
     private final Hl7ParsingService hl7ParsingService;
     private final AdtA01Service adtA01Service;
+    private final AdtA03Service adtA03Service;
 
     @Transactional
     public Hl7IngestResponse ingestRawMessage(String rawMessage) {
@@ -40,15 +41,17 @@ public class Hl7IngestService {
             details = "messageType=" + metadata.messageType()
                     + ", messageControlId=" + metadata.messageControlId();
 
-            // If ADT^A01, process into Patient/Encounter
-            if ("ADT^A01".equals(metadata.messageType())) {
-                try {
+            try {
+                if ("ADT^A01".equals(metadata.messageType())) {
                     adtA01Service.processAdtA01(rawMessage);
                     details += ", processed=ADT^A01";
-                } catch (Exception e) {
-                    error = "ADT^A01 processing failed: " + e.getMessage();
-                    status = "PROCESS_FAILED";
+                } else if ("ADT^A03".equals(metadata.messageType())) {
+                    adtA03Service.processAdtA03(rawMessage);
+                    details += ", processed=ADT^A03";
                 }
+            } catch (Exception e) {
+                status = "PROCESS_FAILED";
+                error = e.getMessage();
             }
 
         } catch (Exception e) {

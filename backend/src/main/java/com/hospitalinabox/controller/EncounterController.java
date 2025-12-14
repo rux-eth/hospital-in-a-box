@@ -5,7 +5,6 @@ import com.hospitalinabox.domain.entity.PatientEntity;
 import com.hospitalinabox.domain.repository.EncounterRepository;
 import com.hospitalinabox.domain.repository.PatientRepository;
 import com.hospitalinabox.dto.EncounterSummary;
-import com.hospitalinabox.dto.PatientSummary;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
@@ -14,41 +13,25 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/patients")
+@RequestMapping("/api/encounters")
 @RequiredArgsConstructor
-public class PatientController {
+public class EncounterController {
 
-    private final PatientRepository patientRepository;
     private final EncounterRepository encounterRepository;
+    private final PatientRepository patientRepository;
 
+    // GET /api/encounters?patientId=...
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public List<PatientSummary> listPatients() {
-        return patientRepository.findAll().stream()
+    public List<EncounterSummary> listByPatient(@RequestParam UUID patientId) {
+        PatientEntity patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new IllegalArgumentException("Patient not found: " + patientId));
+
+        return encounterRepository.findByPatient(patient).stream()
                 .map(this::toSummary)
                 .toList();
     }
 
-    @GetMapping(path = "/{id}/encounters", produces = MediaType.APPLICATION_JSON_VALUE)
-    public List<EncounterSummary> listEncounters(@PathVariable UUID id) {
-        PatientEntity patient = patientRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Patient not found: " + id));
-
-        return encounterRepository.findByPatient(patient).stream()
-                .map(this::toEncounterSummary)
-                .toList();
-    }
-
-    private PatientSummary toSummary(PatientEntity p) {
-        return new PatientSummary(
-                p.getId(),
-                p.getMrn(),
-                p.getFirstName(),
-                p.getLastName(),
-                p.getBirthDate(),
-                p.getGender());
-    }
-
-    private EncounterSummary toEncounterSummary(EncounterEntity e) {
+    private EncounterSummary toSummary(EncounterEntity e) {
         return new EncounterSummary(
                 e.getId(),
                 e.getEncounterIdentifier(),

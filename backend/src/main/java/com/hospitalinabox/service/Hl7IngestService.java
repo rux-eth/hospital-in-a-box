@@ -21,6 +21,7 @@ public class Hl7IngestService {
     private final Hl7ParsingService hl7ParsingService;
     private final AdtA01Service adtA01Service;
     private final AdtA03Service adtA03Service;
+    private final OruR01Service oruR01Service;
 
     @Transactional
     public Hl7IngestResponse ingestRawMessage(String rawMessage) {
@@ -48,10 +49,15 @@ public class Hl7IngestService {
                 } else if ("ADT^A03".equals(metadata.messageType())) {
                     adtA03Service.processAdtA03(rawMessage);
                     details += ", processed=ADT^A03";
+                } else if ("ORU^R01".equals(metadata.messageType())) {
+                    oruR01Service.processOruR01(rawMessage);
+                    details += ", processed=ORU^R01";
                 }
             } catch (Exception e) {
+                // Optional: log stacktrace for debugging
+                e.printStackTrace();
                 status = "PROCESS_FAILED";
-                error = e.getMessage();
+                error = e.toString();
             }
 
         } catch (Exception e) {

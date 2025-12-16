@@ -1,11 +1,16 @@
 package com.hospitalinabox.controller;
 
 import com.hospitalinabox.domain.entity.EncounterEntity;
+import com.hospitalinabox.domain.entity.ObservationEntity;
 import com.hospitalinabox.domain.entity.PatientEntity;
 import com.hospitalinabox.domain.repository.EncounterRepository;
+import com.hospitalinabox.domain.repository.ObservationRepository;
 import com.hospitalinabox.domain.repository.PatientRepository;
 import com.hospitalinabox.dto.EncounterSummary;
+import com.hospitalinabox.dto.ObservationSummary;
 import com.hospitalinabox.dto.PatientSummary;
+import com.hospitalinabox.dto.TimelineEvent;
+import com.hospitalinabox.service.TimelineService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +25,8 @@ public class PatientController {
 
     private final PatientRepository patientRepository;
     private final EncounterRepository encounterRepository;
+    private final ObservationRepository observationRepository;
+    private final TimelineService timelineService;
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public List<PatientSummary> listPatients() {
@@ -37,6 +44,23 @@ public class PatientController {
                 .map(this::toEncounterSummary)
                 .toList();
     }
+
+    @GetMapping(path = "/{id}/observations", produces = MediaType.APPLICATION_JSON_VALUE)
+    public List<ObservationSummary> listObservations(@PathVariable UUID id) {
+        PatientEntity patient = patientRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Patient not found: " + id));
+
+        return observationRepository.findByPatient(patient).stream()
+                .map(this::toObservationSummary)
+                .toList();
+    }
+
+    @GetMapping(path = "/{id}/timeline", produces = MediaType.APPLICATION_JSON_VALUE)
+    public List<TimelineEvent> getTimeline(@PathVariable UUID id) {
+        return timelineService.getTimelineForPatient(id);
+    }
+
+    // ---- mappers ----
 
     private PatientSummary toSummary(PatientEntity p) {
         return new PatientSummary(
@@ -57,5 +81,15 @@ public class PatientController {
                 e.getAdmitTime(),
                 e.getDischargeTime(),
                 e.getReason());
+    }
+
+    private ObservationSummary toObservationSummary(ObservationEntity o) {
+        return new ObservationSummary(
+                o.getId(),
+                o.getCode(),
+                o.getDisplay(),
+                o.getValue(),
+                o.getUnit(),
+                o.getEffectiveTime());
     }
 }

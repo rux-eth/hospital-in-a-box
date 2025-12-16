@@ -9,7 +9,6 @@ import com.hospitalinabox.domain.repository.EncounterRepository;
 import com.hospitalinabox.domain.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -24,7 +23,6 @@ public class AdtA01Service {
     private final EncounterRepository encounterRepository;
     private final FhirResourceService fhirResourceService;
 
-    @Transactional
     public void processAdtA01(String rawMessage) throws HL7Exception {
         Message message = hl7ParsingService.parseMessage(rawMessage);
         Terser terser = new Terser(message);
@@ -32,12 +30,12 @@ public class AdtA01Service {
         // ---- Patient fields (PID) ----
         String mrn = terser.get("/PID-3-1"); // CX.1
         String lastName = terser.get("/PID-5-1"); // XPN.1
-        String firstName = terser.get("/PID-5-2"); // XPN.2
+        String firstName = terser.get("/PID-5-2");// XPN.2
         String birthDateStr = terser.get("/PID-7"); // YYYYMMDD
         String genderCode = terser.get("/PID-8"); // M/F/…
 
         if (mrn == null || mrn.isBlank()) {
-            // In real system we'd NACK this; here we just return
+            // In a real system we'd NACK this; here we just return
             return;
         }
 
@@ -54,8 +52,19 @@ public class AdtA01Service {
 
         // ---- Encounter fields (PV1) ----
         String patientClassCode = terser.get("/PV1-2");
+
+        // Visit number: try spec field PV1-19, fallback to PV1-17 for our sample
+        // messages
         String visitNumber = terser.get("/PV1-19-1");
+        if (visitNumber == null || visitNumber.isBlank()) {
+            visitNumber = terser.get("/PV1-17-1");
+        }
+
+        // Admit datetime: try PV1-44, fallback to MSH-7 (message datetime)
         String admitDateTimeStr = terser.get("/PV1-44");
+        if (admitDateTimeStr == null || admitDateTimeStr.isBlank()) {
+            admitDateTimeStr = terser.get("/MSH-7"); // YYYYMMDDHHMM[SS]
+        }
 
         EncounterEntity encounter = EncounterEntity.builder()
                 .patient(patient)
@@ -69,7 +78,7 @@ public class AdtA01Service {
 
         encounter = encounterRepository.save(encounter);
 
-        // NEW: create/update FHIR resources
+        // Create/update FHIR resources
         fhirResourceService.createOrUpdatePatientResource(patient);
         fhirResourceService.createEncounterResource(encounter);
     }
@@ -95,14 +104,14 @@ public class AdtA01Service {
         };
     }
 
-    private java.time.LocalDate parseHl7Date(String value) {
+    private LocalDate parseHl7Date(String value) {
         if (value == null || value.isBlank())
             return null;
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyyMMdd");
         return LocalDate.parse(value.substring(0, 8), fmt);
     }
 
-    private java.time.OffsetDateTime parseHl7DateTime(String value) {
+    private OffsetDateTime parseHl7DateTime(String value) {
         if (value == null || value.isBlank())
             return null;
         String datePart = value.substring(0, Math.min(8, value.length()));

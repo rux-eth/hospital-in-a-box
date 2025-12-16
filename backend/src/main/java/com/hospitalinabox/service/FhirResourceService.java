@@ -4,151 +4,257 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
 import com.hospitalinabox.domain.entity.EncounterEntity;
 import com.hospitalinabox.domain.entity.FhirResourceEntity;
+import com.hospitalinabox.domain.entity.ObservationEntity;
 import com.hospitalinabox.domain.entity.PatientEntity;
 import com.hospitalinabox.domain.repository.FhirResourceRepository;
 import lombok.RequiredArgsConstructor;
-import org.hl7.fhir.r4.model.Encounter;
-import org.hl7.fhir.r4.model.Identifier;
-import org.hl7.fhir.r4.model.Patient;
-import org.hl7.fhir.r4.model.Period;
-import org.hl7.fhir.r4.model.Reference;
-import org.hl7.fhir.r4.model.Coding;
-import org.hl7.fhir.r4.model.Enumerations.AdministrativeGender;
+import org.hl7.fhir.r4.model.*;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class FhirResourceService {
 
-    private final FhirContext fhirContext;
     private final FhirResourceRepository fhirResourceRepository;
 
-    private IParser jsonParser() {
-        return fhirContext.newJsonParser().setPrettyPrint(false);
-    }
+    // HAPI FHIR context – heavy, so keep one per app
+    private static final FhirContext FHIR_CTX = FhirContext.forR4();
+    private static final IParser JSON_PARSER = FHIR_CTX.newJsonParser().setPrettyPrint(false);
 
-    @Transactional
-    public void createOrUpdatePatientResource(PatientEntity patient) {
-        String fhirId = patient.getId().toString();
+    // -------------------------
+    // Patient
+    // -------------------------
 
-        Patient fhirPatient = new Patient();
-        fhirPatient.setId(fhirId);
+    public void createOrUpdatePatientResource(PatientEntity patientEntity) {
+        String resourceType = "Patient";
+        String resourceId = patientEntity.getId().toString();
 
-        // identifier: MRN
-        Identifier id = new Identifier();
-        id.setSystem("http://hospital-in-a-box.local/mrn");
-        id.setValue(patient.getMrn());
-        fhirPatient.addIdentifier(id);
+        // Build FHIR Patient
+        Patient patient = new Patient();
+        patient.setId(resourceId);
 
-        // name
-        fhirPatient.addName()
-                .setFamily(patient.getLastName())
-                .addGiven(patient.getFirstName());
-
-        // birthDate
-        if (patient.getBirthDate() != null) {
-            fhirPatient.setBirthDate(java.sql.Date.valueOf(patient.getBirthDate()));
+        // Identifier: MRN
+        if (patientEntity.getMrn() != null) {
+            patient.addIdentifier()
+                    .setSystem("http://hospital-in-a-box.example/mrn")
+                    .setValue(patientEntity.getMrn());
         }
 
-        // gender
-        if (patient.getGender() != null) {
-            switch (patient.getGender().toLowerCase()) {
-                case "male" -> fhirPatient.setGender(AdministrativeGender.MALE);
-                case "female" -> fhirPatient.setGender(AdministrativeGender.FEMALE);
-                default -> fhirPatient.setGender(AdministrativeGender.UNKNOWN);
+        // Name
+        HumanName name = new HumanName();
+        name.setFamily(patientEntity.getLastName());
+        if (patientEntity.getFirstName() != null) {
+            name.addGiven(patientEntity.getFirstName());
+        }
+        patient.addName(name);
+
+        // Gender
+        if (patientEntity.getGender() != null) {
+            switch (patientEntity.getGender().toLowerCase()) {
+                case "male" -> patient.setGender(Enumerations.AdministrativeGender.MALE);
+                case "female" -> patient.setGender(Enumerations.AdministrativeGender.FEMALE);
+                default -> patient.setGender(Enumerations.AdministrativeGender.UNKNOWN);
             }
         }
 
-        String json = jsonParser().encodeResourceToString(fhirPatient);
+        // BirthDate
+        if (patientEntity.getBirthDate() != null) {
+            patient.setBirthDate(java.sql.Date.valueOf(patientEntity.getBirthDate()));
+        }
 
-        // Use "now" as event time; don’t depend on createdAt being non-null
-        OffsetDateTime eventTime = OffsetDateTime.now();
+        // Serialize
+        String json = JSON_PARSER.encodeResourceToString(patient);
 
-        FhirResourceEntity entity = FhirResourceEntity.builder()
-                .resourceType("Patient")
-                .resourceId(fhirId)
-                .patient(null)
-                .eventTime(eventTime)
-                .body(json)
-                .build();
+        // eventTime: use patient createdAt
+        OffsetDateTime eventTime = patientEntity.getCreatedAt();
 
-        fhirResourceRepository.findByResourceTypeAndResourceId("Patient", fhirId)
-                .ifPresentOrElse(existing -> {
-                    existing.setBody(json);
-                    existing.setEventTime(eventTime);
-                    fhirResourceRepository.save(existing);
-                }, () -> fhirResourceRepository.save(entity));
+        upsertFhirResource(resourceType, resourceId, patientEntity.getId(), eventTime, json);
     }
 
-    @Transactional
-    public void createEncounterResource(EncounterEntity encounter) {
-        String fhirId = encounter.getId().toString();
+    // -------------------------
+    // Encounter
+    // -------------------------
 
-        Encounter fhirEncounter = new Encounter();
-        fhirEncounter.setId(fhirId);
+    public void createEncounterResource(EncounterEntity encounterEntity) {
+        String resourceType = "Encounter";
+        String resourceId = encounterEntity.getId().toString();
 
-        // status
-        if (encounter.getStatus() != null) {
-            switch (encounter.getStatus().toUpperCase()) {
-                case "INPROGRESS" -> fhirEncounter.setStatus(Encounter.EncounterStatus.INPROGRESS);
-                case "FINISHED" -> fhirEncounter.setStatus(Encounter.EncounterStatus.FINISHED);
-                default -> fhirEncounter.setStatus(Encounter.EncounterStatus.UNKNOWN);
+        Encounter enc = new Encounter();
+        enc.setId(resourceId);
+
+        // Subject reference to Patient
+        PatientEntity patient = encounterEntity.getPatient();
+        if (patient != null && patient.getId() != null) {
+            enc.setSubject(new Reference("Patient/" + patient.getId()));
+        }
+
+        // Status
+        if (encounterEntity.getStatus() != null) {
+            switch (encounterEntity.getStatus().toUpperCase()) {
+                case "INPROGRESS" -> enc.setStatus(Encounter.EncounterStatus.INPROGRESS);
+                case "FINISHED" -> enc.setStatus(Encounter.EncounterStatus.FINISHED);
+                default -> enc.setStatus(Encounter.EncounterStatus.UNKNOWN);
             }
         }
 
-        // class
-        if (encounter.getEncounterClass() != null) {
-            String code = switch (encounter.getEncounterClass().toUpperCase()) {
-                case "INPATIENT" -> "IMP";
-                case "OUTPATIENT" -> "AMB";
-                case "EMERGENCY" -> "EMER";
-                default -> "UNKNOWN";
-            };
-            fhirEncounter.setClass_(new Coding()
-                    .setSystem("http://terminology.hl7.org/CodeSystem/v3-ActCode")
-                    .setCode(code));
+        // Class (inpatient/outpatient/emergency)
+        if (encounterEntity.getEncounterClass() != null) {
+            Coding cls = new Coding();
+            cls.setSystem("http://terminology.hl7.org/CodeSystem/v3-ActCode");
+            switch (encounterEntity.getEncounterClass().toUpperCase()) {
+                case "INPATIENT" -> {
+                    cls.setCode("IMP");
+                    cls.setDisplay("inpatient encounter");
+                }
+                case "OUTPATIENT" -> {
+                    cls.setCode("AMB");
+                    cls.setDisplay("ambulatory");
+                }
+                case "EMERGENCY" -> {
+                    cls.setCode("EMER");
+                    cls.setDisplay("emergency");
+                }
+                default -> {
+                    cls.setCode("UNK");
+                    cls.setDisplay("unknown");
+                }
+            }
+            enc.setClass_(cls);
         }
 
-        // subject reference to Patient
-        if (encounter.getPatient() != null) {
-            String patientFhirId = encounter.getPatient().getId().toString();
-            fhirEncounter.setSubject(new Reference("Patient/" + patientFhirId));
-        }
-
-        // period
+        // Period: admitTime / dischargeTime
         Period period = new Period();
-        if (encounter.getAdmitTime() != null) {
-            period.setStart(java.util.Date.from(encounter.getAdmitTime().toInstant()));
+        if (encounterEntity.getAdmitTime() != null) {
+            period.setStart(java.util.Date.from(encounterEntity.getAdmitTime().toInstant()));
         }
-        if (encounter.getDischargeTime() != null) {
-            period.setEnd(java.util.Date.from(encounter.getDischargeTime().toInstant()));
+        if (encounterEntity.getDischargeTime() != null) {
+            period.setEnd(java.util.Date.from(encounterEntity.getDischargeTime().toInstant()));
         }
-        fhirEncounter.setPeriod(period);
+        enc.setPeriod(period);
 
-        String json = jsonParser().encodeResourceToString(fhirEncounter);
+        // Identifier (visit number)
+        if (encounterEntity.getEncounterIdentifier() != null) {
+            enc.addIdentifier()
+                    .setSystem("http://hospital-in-a-box.example/visit-number")
+                    .setValue(encounterEntity.getEncounterIdentifier());
+        }
 
-        // Prefer admitTime as eventTime; fall back to now
-        OffsetDateTime eventTime = encounter.getAdmitTime() != null
-                ? encounter.getAdmitTime()
-                : OffsetDateTime.now();
+        String json = JSON_PARSER.encodeResourceToString(enc);
 
-        FhirResourceEntity entity = FhirResourceEntity.builder()
-                .resourceType("Encounter")
-                .resourceId(fhirId)
-                .patient(encounter.getPatient())
-                .eventTime(eventTime)
-                .body(json)
-                .build();
+        // eventTime: prefer admitTime, else dischargeTime, else now
+        OffsetDateTime eventTime = encounterEntity.getAdmitTime();
+        if (eventTime == null) {
+            eventTime = encounterEntity.getDischargeTime();
+        }
+        if (eventTime == null) {
+            eventTime = OffsetDateTime.now(ZoneOffset.UTC);
+        }
 
-        fhirResourceRepository.findByResourceTypeAndResourceId("Encounter", fhirId)
-                .ifPresentOrElse(existing -> {
-                    existing.setBody(json);
-                    existing.setEventTime(eventTime);
-                    existing.setPatient(encounter.getPatient());
-                    fhirResourceRepository.save(existing);
-                }, () -> fhirResourceRepository.save(entity));
+        UUID patientId = patient != null ? patient.getId() : null;
+        upsertFhirResource(resourceType, resourceId, patientId, eventTime, json);
+    }
+
+    // -------------------------
+    // Observation
+    // -------------------------
+
+    public void createObservationResource(ObservationEntity observationEntity) {
+        String resourceType = "Observation";
+        String resourceId = observationEntity.getId().toString();
+
+        Observation obs = new Observation();
+        obs.setId(resourceId);
+
+        // Subject (patient)
+        PatientEntity patient = observationEntity.getPatient();
+        if (patient != null && patient.getId() != null) {
+            obs.setSubject(new Reference("Patient/" + patient.getId()));
+        }
+
+        // Encounter
+        EncounterEntity encounter = observationEntity.getEncounter();
+        if (encounter != null && encounter.getId() != null) {
+            obs.setEncounter(new Reference("Encounter/" + encounter.getId()));
+        }
+
+        // Code
+        CodeableConcept code = new CodeableConcept();
+        if (observationEntity.getCode() != null || observationEntity.getDisplay() != null) {
+            Coding coding = new Coding();
+            coding.setSystem("http://hospital-in-a-box.example/lab-codes");
+            coding.setCode(observationEntity.getCode());
+            coding.setDisplay(observationEntity.getDisplay());
+            code.addCoding(coding);
+            obs.setCode(code);
+        }
+
+        // Value
+        String value = observationEntity.getValue();
+        if (value != null) {
+            // Try numeric quantity, else string
+            try {
+                double numeric = Double.parseDouble(value);
+                Quantity q = new Quantity();
+                q.setValue(numeric);
+                if (observationEntity.getUnit() != null) {
+                    q.setUnit(observationEntity.getUnit());
+                }
+                obs.setValue(q);
+            } catch (NumberFormatException nfe) {
+                obs.setValue(new StringType(value));
+            }
+        }
+
+        // Effective time
+        if (observationEntity.getEffectiveTime() != null) {
+            obs.setEffective(new DateTimeType(
+                    java.util.Date.from(observationEntity.getEffectiveTime().toInstant())));
+        }
+
+        String json = JSON_PARSER.encodeResourceToString(obs);
+
+        // eventTime: use effectiveTime, else now
+        OffsetDateTime eventTime = observationEntity.getEffectiveTime();
+        if (eventTime == null) {
+            eventTime = OffsetDateTime.now(ZoneOffset.UTC);
+        }
+
+        UUID patientId = patient != null ? patient.getId() : null;
+        upsertFhirResource(resourceType, resourceId, patientId, eventTime, json);
+    }
+
+    // -------------------------
+    // Helper: upsert FHIR resource row
+    // -------------------------
+
+    private void upsertFhirResource(
+            String resourceType,
+            String resourceId,
+            UUID patientId,
+            OffsetDateTime eventTime,
+            String jsonBody) {
+        Optional<FhirResourceEntity> existingOpt = fhirResourceRepository.findByResourceTypeAndResourceId(resourceType,
+                resourceId);
+
+        FhirResourceEntity entity = existingOpt.orElseGet(FhirResourceEntity::new);
+        entity.setResourceType(resourceType);
+        entity.setResourceId(resourceId);
+        entity.setEventTime(eventTime);
+        entity.setBody(jsonBody);
+
+        if (patientId != null) {
+            PatientEntity stubPatient = new PatientEntity();
+            stubPatient.setId(patientId);
+            entity.setPatient(stubPatient);
+        } else {
+            entity.setPatient(null);
+        }
+
+        fhirResourceRepository.save(entity);
     }
 }

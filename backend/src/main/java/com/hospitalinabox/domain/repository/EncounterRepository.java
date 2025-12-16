@@ -12,5 +12,7 @@ public interface EncounterRepository extends JpaRepository<EncounterEntity, UUID
 
     List<EncounterEntity> findByPatient(PatientEntity patient);
 
-    Optional<EncounterEntity> findByPatientAndEncounterIdentifier(PatientEntity patient, String encounterIdentifier);
+    Optional<EncounterEntity> findFirstByPatientAndEncounterIdentifierOrderByAdmitTimeDesc(
+            PatientEntity patient,
+            String encounterIdentifier);
 }

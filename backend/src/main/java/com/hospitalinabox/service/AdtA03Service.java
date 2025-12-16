@@ -9,7 +9,6 @@ import com.hospitalinabox.domain.repository.EncounterRepository;
 import com.hospitalinabox.domain.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -22,8 +21,8 @@ public class AdtA03Service {
     private final Hl7ParsingService hl7ParsingService;
     private final PatientRepository patientRepository;
     private final EncounterRepository encounterRepository;
+    private final FhirResourceService fhirResourceService;
 
-    @Transactional
     public void processAdtA03(String rawMessage) throws HL7Exception {
         Message message = hl7ParsingService.parseMessage(rawMessage);
         Terser terser = new Terser(message);
@@ -31,7 +30,6 @@ public class AdtA03Service {
         // Patient MRN from PID-3
         String mrn = terser.get("/PID-3-1");
         if (mrn == null || mrn.isBlank()) {
-            // In a real system we'd NACK – here we just stop
             return;
         }
 
@@ -42,16 +40,27 @@ public class AdtA03Service {
         }
         PatientEntity patient = patientOpt.get();
 
-        // Visit number from PV1-19
+        // Visit number: PV1-19, fallback to PV1-17 (our sample)
         String visitNumber = terser.get("/PV1-19-1");
-        // Discharge datetime from PV1-45 (HL7 v2.5+)
-        String dischargeDateTimeStr = terser.get("/PV1-45");
+        if (visitNumber == null || visitNumber.isBlank()) {
+            visitNumber = terser.get("/PV1-17-1");
+        }
 
-        Optional<EncounterEntity> encounterOpt = encounterRepository.findByPatientAndEncounterIdentifier(patient,
-                visitNumber);
+        // Discharge datetime: PV1-45, fallback to PV1-39, then MSH-7
+        String dischargeDateTimeStr = terser.get("/PV1-45");
+        if (dischargeDateTimeStr == null || dischargeDateTimeStr.isBlank()) {
+            dischargeDateTimeStr = terser.get("/PV1-39");
+        }
+        if (dischargeDateTimeStr == null || dischargeDateTimeStr.isBlank()) {
+            dischargeDateTimeStr = terser.get("/MSH-7");
+        }
+
+        Optional<EncounterEntity> encounterOpt = encounterRepository
+                .findFirstByPatientAndEncounterIdentifierOrderByAdmitTimeDesc(
+                        patient, visitNumber);
 
         if (encounterOpt.isEmpty()) {
-            // No matching encounter – could log this in details later
+            // No matching encounter – could log this in audit details later
             return;
         }
 
@@ -60,6 +69,9 @@ public class AdtA03Service {
         encounter.setDischargeTime(parseHl7DateTime(dischargeDateTimeStr));
 
         encounterRepository.save(encounter);
+
+        // Update FHIR Encounter
+        fhirResourceService.createEncounterResource(encounter);
     }
 
     private OffsetDateTime parseHl7DateTime(String value) {

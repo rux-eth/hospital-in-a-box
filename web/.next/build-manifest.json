@@ -1,0 +1,41 @@
+{
+  "polyfillFiles": [
+    "static/chunks/polyfills-78c92fac7aa8fdd8.js"
+  ],
+  "devFiles": [],
+  "ampDevFiles": [],
+  "lowPriorityFiles": [
+    "static/RT6eElsE-6at2p5RL8_Dc/_buildManifest.js",
+    "static/RT6eElsE-6at2p5RL8_Dc/_ssgManifest.js"
+  ],
+  "rootMainFiles": [],
+  "pages": {
+    "/": [
+      "static/chunks/webpack-ee7e63bc15b31913.js",
+      "static/chunks/framework-ecc4130bc7a58a64.js",
+      "static/chunks/main-ac52e5f1ea1d2a16.js",
+      "static/chunks/321-3646f2f90b1707ca.js",
+      "static/chunks/pages/index-c8b8bc8872133446.js"
+    ],
+    "/_app": [
+      "static/chunks/webpack-ee7e63bc15b31913.js",
+      "static/chunks/framework-ecc4130bc7a58a64.js",
+      "static/chunks/main-ac52e5f1ea1d2a16.js",
+      "static/chunks/pages/_app-753213cf38d40131.js"
+    ],
+    "/_error": [
+      "static/chunks/webpack-ee7e63bc15b31913.js",
+      "static/chunks/framework-ecc4130bc7a58a64.js",
+      "static/chunks/main-ac52e5f1ea1d2a16.js",
+      "static/chunks/pages/_error-77823ddac6993d35.js"
+    ],
+    "/patients/[id]": [
+      "static/chunks/webpack-ee7e63bc15b31913.js",
+      "static/chunks/framework-ecc4130bc7a58a64.js",
+      "static/chunks/main-ac52e5f1ea1d2a16.js",
+      "static/chunks/321-3646f2f90b1707ca.js",
+      "static/chunks/pages/patients/[id]-8c3ecad270c470fe.js"
+    ]
+  },
+  "ampFirstPages": []
+}

@@ -35,8 +35,8 @@ public class FhirResourceEntity {
     @Column(name = "event_time")
     private OffsetDateTime eventTime;
 
-    @Lob
-    @Column(name = "body", nullable = false)
+    // Store as plain TEXT in Postgres, not as a large-object OID
+    @Column(name = "body", nullable = false, columnDefinition = "text")
     private String body; // FHIR JSON
 
     @Column(name = "created_at", nullable = false)

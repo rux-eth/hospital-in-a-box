@@ -2,6 +2,7 @@ package com.hospitalinabox.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -20,15 +21,16 @@ public class Hl7MessageEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    // From MSH-10, will fill once we parse
+    // From MSH-10
     @Column(name = "message_control_id", length = 64)
     private String messageControlId;
 
-    // e.g. ADT^A01, ADT^A03, ORU^R01
+    // e.g., ADT^A01, ADT^A03, ORU^R01
     @Column(name = "message_type", length = 32)
     private String messageType;
 
-    @Column(name = "payload", nullable = false, columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "payload", nullable = false)
     private String payload;
 
     @Column(name = "received_at", nullable = false)

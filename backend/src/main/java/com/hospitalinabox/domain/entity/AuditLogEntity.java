@@ -2,6 +2,7 @@ package com.hospitalinabox.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -25,13 +26,15 @@ public class AuditLogEntity {
     private Hl7MessageEntity hl7Message;
 
     @Column(name = "status", nullable = false, length = 32)
-    private String status; // e.g. RECEIVED, SUCCESS, FAILED
+    private String status; // RECEIVED, PARSED, PROCESS_FAILED, etc.
 
-    @Column(name = "error_message", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "error_message")
     private String errorMessage;
 
-    @Column(name = "details", columnDefinition = "TEXT")
-    private String details; // optional JSON/string diagnostics
+    @Lob
+    @Column(name = "details")
+    private String details;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;

@@ -2,6 +2,7 @@ package com.hospitalinabox.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -26,10 +27,10 @@ public class EncounterEntity {
     private String encounterIdentifier;
 
     @Column(name = "status", length = 32)
-    private String status; // e.g. INPROGRESS, FINISHED
+    private String status; // INPROGRESS, FINISHED
 
     @Column(name = "class", length = 32)
-    private String encounterClass; // INPATIENT, OUTPATIENT
+    private String encounterClass; // INPATIENT, OUTPATIENT, EMERGENCY, etc.
 
     @Column(name = "admit_time")
     private OffsetDateTime admitTime;

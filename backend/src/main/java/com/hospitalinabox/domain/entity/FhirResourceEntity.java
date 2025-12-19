@@ -2,6 +2,7 @@ package com.hospitalinabox.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -34,7 +35,8 @@ public class FhirResourceEntity {
     @Column(name = "event_time")
     private OffsetDateTime eventTime;
 
-    @Column(name = "body", nullable = false, columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "body", nullable = false)
     private String body; // FHIR JSON
 
     @Column(name = "created_at", nullable = false)

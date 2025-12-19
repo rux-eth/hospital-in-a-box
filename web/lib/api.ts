@@ -52,3 +52,22 @@ export async function postHl7Message(raw: string): Promise<unknown> {
   }
   return res.json();
 }
+export type FhirResourceSummary = {
+  id: string;
+  resourceType: string;
+  resourceId: string;
+  eventTime: string | null;
+  body: string;
+};
+
+export async function fetchFhirResources(
+  patientId: string
+): Promise<FhirResourceSummary[]> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/patients/${patientId}/fhir-resources`
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to fetch FHIR resources: ${res.status}`);
+  }
+  return res.json();
+}
